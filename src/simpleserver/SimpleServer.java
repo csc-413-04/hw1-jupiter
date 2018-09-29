@@ -1,8 +1,13 @@
 package simpleserver;
 
+import com.google.gson.*;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+
 
 class SimpleServer {
 
@@ -10,6 +15,10 @@ class SimpleServer {
     ServerSocket ding;
     Socket dong = null;
     String resource = null;
+//--------------load database-----------------------
+
+    loadDatabase();
+//--------------------------------------------------
     try {
       ding = new ServerSocket(1299);
       System.out.println("Opened socket " + 1299);
@@ -68,4 +77,36 @@ class SimpleServer {
       System.exit(1);
     }
   }
+//--------------------------------------------------------- zihao 9/28
+  public static void loadDatabase(){
+    Gson gson = new Gson();
+    BufferedReader br;
+
+    try {
+      br = new BufferedReader(new FileReader("src/data.json"));
+      JsonParser jsonParser = new JsonParser();
+      JsonObject obj = jsonParser.parse(br).getAsJsonObject();
+
+      User[] users = gson.fromJson(obj.get("users"), User[].class);
+      Post[] posts = gson.fromJson(obj.get("posts"), Post[].class);
+
+      User.loadAll();
+      Post.loadAll();
+
+      Response response = new Response();
+      response.setUsers(users);
+      response.setPosts(posts);
+
+      String userJsonString = gson.toJson(User.getUser(0));
+      String postJsonString = gson.toJson(Post.getPost(0));
+
+      System.out.println(userJsonString);
+      System.out.println(postJsonString);
+
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    }
+
+  }
+//---------------------------------------------------------- zihao 9/28
 }

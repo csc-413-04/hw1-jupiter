@@ -47,4 +47,8 @@ public class User {
             allUsers.get(0).register();
         }
     }
+
+    public static Map getInstance(){
+        return useridDict;
+    }
 }

@@ -44,4 +44,8 @@ public class Post {
             allPosts.get(0).register();
         }
     }
+
+    public static Map getInstance(){
+        return postidDict;
+    }
 }
