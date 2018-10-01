@@ -1,112 +1,113 @@
 package simpleserver;
 
-import com.google.gson.*;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import database.Post;
+import database.User;
+import processor.Processor;
+import processor.ProcessorFactory;
+import request.Request;
+import response.Response;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 
+public class SimpleServer {
+    public static final int DEFAULT_PORT = 1299;
+    private static ServerSocket socket;
+    private static Socket client = null;
 
-class SimpleServer {
+    public static void main(String[] args) throws IOException {
+        start();
+        loadDatabase();
+        while (true) {
+            try {
+                client = socket.accept(); // waits for client here
+                InputStream stream = client.getInputStream();
+                Request request = new Request(stream);
+                //can check URI is valid (URL, ajex?)
+                System.out.println(request.getUri());
+                System.out.println(request.getParameters());
 
-  public static void main(String[] args) throws IOException {
-    ServerSocket ding;
-    Socket dong = null;
-    String resource = null;
-//--------------load database-----------------------
+                Processor processor = ProcessorFactory.makeProcessor(request);
+                Response response = processor.process(request);
 
-    loadDatabase();
-//--------------------------------------------------
-    try {
-      ding = new ServerSocket(1299);
-      System.out.println("Opened socket " + 1299);
-      while (true) {
+                OutputStream outputStream = client.getOutputStream();
+                BufferedOutputStream out = new BufferedOutputStream(outputStream);
+                PrintWriter writer = new PrintWriter(out, true);  // char output to the client
+                writer.println("HTTP/1.1 200 OK");
+                writer.println("Server: TEST");
+                writer.println("Connection: close");
+                writer.println("Content-type: application/json");
+                writer.println("");
+                // Body of our response
+                if (response.getStatus().equals("ERROR")) {
+                    writer.println("{“status” : “ERROR” }");
+                } else {
+                    com.google.gson.Gson gson = new GsonBuilder().setPrettyPrinting().create();;
+                    JsonObject object = new JsonObject();
+                    JsonElement data = response.getEntries() == 0? gson.toJsonTree(new Object[0]) : gson.toJsonTree(response.getResponseBody());
+                    object.add("data", data);
+                    object.addProperty("status", "OK");
+                    object.addProperty("entries", response.getEntries());
+                    String jsonString = gson.toJson(object);
+                    writer.println(jsonString);
+                }
+                client.close();
 
-        // keeps listening for new clients, one at a time
-        try {
-          dong = ding.accept(); // waits for client here
-        } catch (IOException e) {
-          System.out.println("Error opening socket");
-          System.exit(1);
-        }
-
-        InputStream stream = dong.getInputStream();
-        BufferedReader in = new BufferedReader(new InputStreamReader(stream));
-        try {
-
-          // read the first line to get the request method, URI and HTTP version
-          String line = in.readLine();
-          System.out.println("----------REQUEST START---------");
-          System.out.println(line);
-          // read only headers
-          line = in.readLine();
-          while (line != null && line.trim().length() > 0) {
-            int index = line.indexOf(": ");
-            if (index > 0) {
-              System.out.println(line);
-            } else {
-              break;
+            } catch (Exception e) {
+                sendErrorResponse();
+                client.close();
             }
-            line = in.readLine();
-          }
-          System.out.println("----------REQUEST END---------\n\n");
-        } catch (IOException e) {
-          System.out.println("Error reading");
-          System.exit(1);
         }
-
-        BufferedOutputStream out = new BufferedOutputStream(dong.getOutputStream());
-        PrintWriter writer = new PrintWriter(out, true);  // char output to the client
-
-        // every response will always have the status-line, date, and server name
-        writer.println("HTTP/1.1 200 OK");
-        writer.println("Server: TEST");
-        writer.println("Connection: close");
-        writer.println("Content-type: text/html");
-        writer.println("");
-
-        // Body of our response
-        writer.println("<h1>Some cool response!</h1>");
-
-        dong.close();
-      }
-    } catch (IOException e) {
-      System.out.println("Error opening socket");
-      System.exit(1);
-    }
-  }
-//--------------------------------------------------------- zihao 9/28
-  public static void loadDatabase(){
-    Gson gson = new Gson();
-    BufferedReader br;
-
-    try {
-      br = new BufferedReader(new FileReader("src/data.json"));
-      JsonParser jsonParser = new JsonParser();
-      JsonObject obj = jsonParser.parse(br).getAsJsonObject();
-
-      User[] users = gson.fromJson(obj.get("users"), User[].class);
-      Post[] posts = gson.fromJson(obj.get("posts"), Post[].class);
-
-      User.loadAll();
-      Post.loadAll();
-
-      Response response = new Response();
-      response.setUsers(users);
-      response.setPosts(posts);
-
-      String userJsonString = gson.toJson(User.getUser(0));
-      String postJsonString = gson.toJson(Post.getPost(0));
-
-      System.out.println(userJsonString);
-      System.out.println(postJsonString);
-
-    } catch (FileNotFoundException e) {
-      e.printStackTrace();
     }
 
-  }
-//---------------------------------------------------------- zihao 9/28
+    private static void sendErrorResponse() {
+        try {
+            OutputStream outputStream = client.getOutputStream();
+            BufferedOutputStream out = new BufferedOutputStream(outputStream);
+            PrintWriter writer = new PrintWriter(out, true);  // char output to the client
+            writer.println("HTTP/1.1 400 Error");
+            writer.println("Server: TEST");
+            writer.println("Connection: close");
+            writer.println("Content-type: application/json");
+            writer.println("");
+            writer.println("{“status” : “ERROR” }");
+            System.out.println("{“status” : “ERROR”}");
+        } catch (Exception e) {
+            System.out.println("Error opening buffer writer");
+            System.exit(1);
+        }
+    }
+
+    public static void start() throws IOException {
+//        ServerSocket socket;
+        try {
+            socket = new ServerSocket( DEFAULT_PORT );
+            System.out.println("Opened socket " + DEFAULT_PORT);
+            client = null;
+        } catch (IOException e) {
+            System.out.println("Error opening socket");
+            System.exit(1);
+        }
+    }
+
+    private static void loadDatabase () {
+        com.google.gson.Gson gson = new com.google.gson.Gson();
+        BufferedReader br;
+        try {
+            br = new BufferedReader(new FileReader("src/data.json"));
+            com.google.gson.JsonParser jsonParser = new com.google.gson.JsonParser();
+            com.google.gson.JsonObject obj = jsonParser.parse(br).getAsJsonObject();
+            User[] users = gson.fromJson(obj.get("users"), User[].class);
+            User.loadAll();
+            Post[] posts = gson.fromJson(obj.get("posts"), Post[].class);
+            Post.loadAll();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
