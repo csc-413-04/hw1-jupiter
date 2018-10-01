@@ -17,7 +17,9 @@ public class Post {
         this.postid = postid;
         System.out.println(postid);
     }
-
+    public String getData(){
+        return data;
+    }
 
     public Post(){
         allPosts.add(this);
