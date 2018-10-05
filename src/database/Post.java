@@ -43,7 +43,7 @@ public class Post {
 
     public static void loadAll(){
         for(int i=0; i < allPosts.size(); i++){
-            allPosts.get(0).register();
+            allPosts.get(i).register();
         }
     }
 
